@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEMU Protocol — Live</title>
+<style>
+  :root{
+    --bg:#0c0c12;--panel:#15151f;--panel2:#1c1c2a;--border:#2b2b3c;--text:#ececf4;
+    --muted:#9a9ab4;--purple:#7f77dd;--green:#34d399;--greenbg:#10241d;--red:#f87171;
+    --redbg:#2a1414;--amber:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 20px 80px}
+  .brand{font-weight:700;letter-spacing:.5px}.brand .dot{color:var(--purple)}
+  .muted{color:var(--muted)}
+  .pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;background:var(--panel2);color:var(--muted);border:1px solid var(--border)}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-size:14px;font-weight:600;padding:9px 16px;background:var(--purple);color:#0b0b12;transition:.12s}
+  button:hover{background:#938cea}button:active{transform:scale(.98)}
+  button:disabled{opacity:.4;cursor:default}
+  button.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+  button.ghost:hover{background:var(--panel2)}button.sm{padding:6px 12px;font-size:13px}
+  input,select{font-family:inherit;font-size:15px;padding:11px 13px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);width:100%}
+  input:focus,select:focus{outline:none;border-color:var(--purple)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .num{font-variant-numeric:tabular-nums}.ok{color:var(--green)}.bad{color:var(--red)}
+  .tag-pass{background:var(--greenbg);color:var(--green);padding:3px 9px;border-radius:6px;font-size:12px;font-weight:700}
+  .tag-fail{background:var(--redbg);color:var(--red);padding:3px 9px;border-radius:6px;font-size:12px;font-weight:700}
+  .overlay{position:fixed;inset:0;background:#07070bf2;display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .login-box{width:100%;max-width:390px;text-align:center}.login-box .card{padding:30px 26px}
+  .err{color:var(--red);font-size:13px;min-height:18px;margin-top:6px}
+  .ok-msg{color:var(--green);font-size:13px;min-height:18px;margin-top:6px}
+  .hidden{display:none!important}
+  .tabs{display:flex;gap:8px;margin:22px 0 18px;border-bottom:1px solid var(--border)}
+  .tab{padding:10px 16px;background:none;color:var(--muted);border:none;border-bottom:2px solid transparent;border-radius:0;font-weight:600}
+  .tab:hover{background:none;color:var(--text)}.tab.active{color:var(--text);border-bottom-color:var(--purple)}
+  .stat{background:var(--panel2);border-radius:10px;padding:14px 16px;min-width:150px;flex:1}
+  .stat .l{font-size:12px;color:var(--muted)}.stat .v{font-size:24px;font-weight:700;margin-top:2px}
+  .slider-row{display:grid;grid-template-columns:170px 1fr 90px;align-items:center;gap:14px;margin:14px 0}
+  .slider-row label{font-size:14px;color:var(--muted)}.slider-row .out{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+  input[type=range]{padding:0;accent-color:var(--purple)}
+  .bar-track{background:var(--panel2);border-radius:6px;height:26px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:700;color:#0b0b12;white-space:nowrap;transition:width .3s}
+  .logline{font-size:13px;padding:6px 0;border-bottom:1px solid var(--border);color:var(--muted)}.logline b{color:var(--text)}
+  h1{font-size:22px}h2{font-size:17px;margin-bottom:4px}a{color:var(--purple)}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--green)}
+  .live .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+</style>
+</head>
+<body>
+
+<!-- ===== CONFIG BANNER (shown only if keys not set) ===== -->
+<div class="overlay" id="cfgWarn">
+  <div class="login-box"><div class="card" style="text-align:left">
+    <h2 style="margin-bottom:8px">Almost there</h2>
+    <p class="muted" style="font-size:14px">This file isn't connected to Supabase yet. Open
+    <b style="color:var(--text)">index.html</b> and paste your project URL + anon key into the
+    <b style="color:var(--text)">CONFIG</b> block at the bottom, then reload.</p>
+  </div></div>
+</div>
+
+<!-- ===== AUTH ===== -->
+<div class="overlay hidden" id="auth">
+  <div class="login-box">
+    <div style="font-size:30px;margin-bottom:6px" class="brand">DEMU<span class="dot">.</span></div>
+    <div class="muted" style="margin-bottom:22px;font-size:14px">Royalty settlement protocol · live demo</div>
+    <div class="card">
+      <div style="text-align:left;margin-bottom:12px">
+        <div class="muted" style="font-size:13px;margin-bottom:6px">Email</div>
+        <input id="email" type="email" placeholder="you@example.com" autocomplete="off">
+      </div>
+      <div style="text-align:left">
+        <div class="muted" style="font-size:13px;margin-bottom:6px">Password</div>
+        <input id="pw" type="password" placeholder="••••••••" autocomplete="off">
+      </div>
+      <div class="err" id="authErr"></div><div class="ok-msg" id="authOk"></div>
+      <div class="row" style="margin-top:10px">
+        <button style="flex:1" onclick="signIn()">Sign in</button>
+        <button class="ghost" style="flex:1" onclick="signUp()">Create account</button>
+      </div>
+      <div class="note">Separate demo project · no real funds</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== AGREEMENT GATE ===== -->
+<div class="overlay hidden" id="agree">
+  <div class="login-box"><div class="card" style="text-align:left">
+    <h2 style="margin-bottom:10px">One quick thing, Session</h2>
+    <p class="muted" style="font-size:14px;margin-bottom:16px">To access the DEMU protocol, the signed-in user must acknowledge the following statement on the record:</p>
+    <div style="background:var(--panel2);border-radius:10px;padding:16px;font-size:16px;font-weight:700;text-align:center;margin-bottom:18px">“Session is gay.”</div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="ghost sm" id="disagreeBtn" onclick="dodge()">Disagree</button>
+      <button onclick="enterApp()">I, Session Cruz, agree</button>
+    </div>
+    <div class="note" id="dodgeMsg"></div>
+  </div></div>
+</div>
+
+<!-- ===== APP ===== -->
+<div class="wrap hidden" id="app">
+  <div class="row" style="justify-content:space-between">
+    <div><span class="brand" style="font-size:24px">DEMU<span class="dot">.</span></span>
+      <span class="pill" style="margin-left:10px">Live</span>
+      <span class="live" style="margin-left:8px"><span class="dot"></span>realtime</span></div>
+    <div class="muted" style="font-size:13px">Signed in as <b id="whoami" style="color:var(--text)">—</b>
+      &nbsp;<a href="#" onclick="signOut();return false">sign out</a></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab1btn" onclick="showTab(1)">Protocol</button>
+    <button class="tab" id="tab2btn" onclick="showTab(2)">Chain stress test</button>
+  </div>
+
+  <!-- TAB 1 -->
+  <div id="tab1">
+    <h1 style="margin-bottom:4px">Songs on DEMU</h1>
+    <p class="muted" style="margin-bottom:16px;font-size:14px">Everything here is saved and shared. Open this on two devices and watch them update together.</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <span class="muted" style="font-size:14px">Song</span>
+          <select id="songPick" style="min-width:220px" onchange="selectSong(this.value)"></select>
+        </div>
+        <div class="row">
+          <input id="newTitle" style="width:200px" placeholder="New song title">
+          <button class="sm" onclick="registerSong()">Register + mint 1,000</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="liveState" class="hidden">
+      <div class="row" style="margin-bottom:16px">
+        <div class="stat"><div class="l">Song</div><div class="v" id="sTitle">—</div></div>
+        <div class="stat"><div class="l">Vault (unclaimed)</div><div class="v num" id="sVault">$0</div></div>
+        <div class="stat"><div class="l">Cumulative / token</div><div class="v num" id="sCum">$0.0000</div></div>
+        <div class="stat"><div class="l">Distributed</div><div class="v num" id="sDist">$0</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2>Revenue arrives</h2>
+        <p class="muted" style="font-size:14px;margin:6px 0 14px">One global counter bumps up — no per-holder bookkeeping.</p>
+        <div class="row">
+          <button class="ghost sm" onclick="addRevenue(50,'Streaming royalties')">Streaming +$50</button>
+          <button class="ghost sm" onclick="addRevenue(1000,'Sync license')">Sync +$1,000</button>
+          <button class="ghost sm" onclick="addRevenue(5000,'AI training license')">AI license +$5,000</button>
+          <button class="ghost sm" onclick="addRevenue(250,'UGC micro-licensing')">UGC +$250</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <h2>Cap table & payouts</h2>
+          <button class="ghost sm" onclick="sellToInvestor()">Artist sells 100 tokens to an investor</button>
+        </div>
+        <table><thead><tr><th>Holder</th><th>Role</th><th class="num">Tokens</th><th class="num">Share</th>
+          <th class="num">Claimable now</th><th class="num">Claimed</th><th></th></tr></thead>
+          <tbody id="capBody"></tbody></table>
+      </div>
+
+      <div class="card"><h2>Audit trail</h2>
+        <p class="muted" style="font-size:14px;margin:6px 0 10px">Permanent, public, verifiable.</p>
+        <div id="auditLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2 -->
+  <div id="tab2" class="hidden">
+    <h1 style="margin-bottom:4px">Which chain survives MAX registration load?</h1>
+    <p class="muted" style="margin-bottom:18px;font-size:14px">Drag the knobs. <b style="color:var(--amber)">Watch Cardano flip red as you drop the batch size.</b> This tab runs entirely in your browser — it's the spike model.</p>
+    <div class="card" style="margin-bottom:16px">
+      <div class="slider-row"><label>Catalog backfill</label><input type="range" id="kBackfill" min="1" max="200" step="1" value="100" oninput="runStress()"><span class="out" id="oBackfill">100M</span></div>
+      <div class="slider-row"><label>New works / day</label><input type="range" id="kNew" min="10" max="500" step="10" value="120" oninput="runStress()"><span class="out" id="oNew">120k</span></div>
+      <div class="slider-row"><label>Works per batch tx</label><input type="range" id="kBatch" min="1" max="200" step="1" value="50" oninput="runStress()"><span class="out" id="oBatch">50</span></div>
+      <div class="slider-row"><label>Drain target (days)</label><input type="range" id="kTarget" min="1" max="180" step="1" value="30" oninput="runStress()"><span class="out" id="oTarget">30</span></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><h2 style="margin-bottom:12px">Time to onboard the whole catalog</h2><div id="bars"></div></div>
+    <div class="card"><table><thead><tr><th>Chain</th><th>Privacy</th><th class="num">Reg/sec</th><th class="num">Catalog drain</th><th class="num">p99 latency</th><th>Verdict</th></tr></thead><tbody id="stressBody"></tbody></table>
+      <div class="note">Model, not a live benchmark. Public-doc numbers, meant to be replaced with measured testnet results.</div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============ CONFIG — paste your two values here ============ */
+const SUPABASE_URL      = "https://nzsukxyvylomglzbkoej.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56c3VreHl2eWxvbWdsemJrb2VqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMzc1NDcsImV4cCI6MjA5NzgxMzU0N30.tje3U0tF-shIDTxRW_NdC-XCgujYUXbP78zi-opt5vs";
+/* ============================================================= */
+
+let sb=null, currentSong=null, songsCache=[];
+const configured = !SUPABASE_URL.includes("YOUR-PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR-ANON");
+
+function boot(){
+  if(!configured){ return; }            // config banner stays up
+  document.getElementById('cfgWarn').classList.add('hidden');
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.getSession().then(({data})=>{
+    if(data.session){ document.getElementById('whoami').textContent=data.session.user.email; gateOrEnter(); }
+    else { document.getElementById('auth').classList.remove('hidden'); }
+  });
+}
+
+/* ---------- AUTH ---------- */
+async function signUp(){
+  clearAuthMsg();
+  const {error}=await sb.auth.signUp({email:val('email'),password:val('pw')});
+  if(error){ authErr(error.message); return; }
+  const {data}=await sb.auth.getSession();
+  if(data.session){ afterAuth(); } else { authOk("Account created. If email confirmation is on, confirm then sign in."); }
+}
+async function signIn(){
+  clearAuthMsg();
+  const {error}=await sb.auth.signInWithPassword({email:val('email'),password:val('pw')});
+  if(error){ authErr(error.message); return; }
+  afterAuth();
+}
+async function signOut(){ await sb.auth.signOut(); location.reload(); }
+function afterAuth(){
+  sb.auth.getUser().then(({data})=>{ document.getElementById('whoami').textContent=data.user?.email||'—'; });
+  document.getElementById('auth').classList.add('hidden');
+  gateOrEnter();
+}
+let agreed=false;
+function gateOrEnter(){ if(agreed){ enterApp(); } else { document.getElementById('agree').classList.remove('hidden'); } }
+const val=id=>document.getElementById(id).value.trim();
+const authErr=m=>document.getElementById('authErr').textContent=m;
+const authOk=m=>document.getElementById('authOk').textContent=m;
+const clearAuthMsg=()=>{authErr('');authOk('');};
+
+/* ---------- AGREEMENT GAG ---------- */
+let dodges=0;const dodgeLines=['That button does not appear to work.','Hm. Still broken. Try the other one.','Disagree is currently unavailable.','The only way forward is agreement.'];
+function dodge(){dodges++;document.getElementById('dodgeMsg').textContent=dodgeLines[Math.min(dodges-1,dodgeLines.length-1)];document.getElementById('disagreeBtn').style.opacity=Math.max(.25,1-dodges*.2);}
+function enterApp(){
+  agreed=true;
+  document.getElementById('agree').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  runStress(); loadSongs(); subscribeRealtime();
+}
+
+/* ---------- TABS ---------- */
+function showTab(n){
+  document.getElementById('tab1').classList.toggle('hidden',n!==1);
+  document.getElementById('tab2').classList.toggle('hidden',n!==2);
+  document.getElementById('tab1btn').classList.toggle('active',n===1);
+  document.getElementById('tab2btn').classList.toggle('active',n===2);
+}
+
+/* ---------- PROTOCOL (Supabase-backed) ---------- */
+const fmt=n=>'$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:2,minimumFractionDigits:(Number(n)%1)?2:0});
+const fmt4=n=>'$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:4});
+
+async function loadSongs(){
+  const {data,error}=await sb.from('songs').select('*').order('created_at',{ascending:true});
+  if(error){console.error(error);return;}
+  songsCache=data||[];
+  const pick=document.getElementById('songPick'); pick.innerHTML='';
+  songsCache.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.title;pick.appendChild(o);});
+  if(songsCache.length){
+    if(!currentSong||!songsCache.find(s=>s.id===currentSong)) currentSong=songsCache[0].id;
+    pick.value=currentSong; document.getElementById('liveState').classList.remove('hidden'); renderSong();
+  } else { document.getElementById('liveState').classList.add('hidden'); }
+}
+function selectSong(id){ currentSong=id; renderSong(); }
+async function registerSong(){
+  const t=document.getElementById('newTitle').value.trim()||'Untitled';
+  const {data,error}=await sb.rpc('register_song',{p_title:t});
+  if(error){alert(error.message);return;}
+  document.getElementById('newTitle').value=''; currentSong=data; await loadSongs();
+}
+async function addRevenue(amt,label){
+  if(!currentSong)return;
+  const {error}=await sb.rpc('add_revenue',{p_song:currentSong,p_amount:amt,p_label:label});
+  if(error)alert(error.message);
+}
+async function claim(holderId){
+  const {error}=await sb.rpc('claim_payout',{p_holder:holderId});
+  if(error)alert(error.message);
+}
+async function sellToInvestor(){
+  if(!currentSong)return;
+  const {error}=await sb.rpc('transfer_tokens',{p_song:currentSong,p_from_role:'Artist',p_to_name:'Ari (investor)',p_n:100});
+  if(error)alert(error.message);
+}
+async function renderSong(){
+  if(!currentSong)return;
+  const s=songsCache.find(x=>x.id===currentSong);
+  const {data:hb}=await sb.from('holder_balances').select('*').eq('song_id',currentSong).order('tokens',{ascending:false});
+  const {data:rev}=await sb.from('revenue_events').select('*').eq('song_id',currentSong).order('created_at',{ascending:false}).limit(15);
+  const {data:cl}=await sb.from('claims').select('*').eq('song_id',currentSong).order('created_at',{ascending:false}).limit(15);
+  if(s){
+    document.getElementById('sTitle').textContent=s.title;
+    document.getElementById('sVault').textContent=fmt(s.vault_balance);
+    document.getElementById('sCum').textContent=fmt4(s.cum_per_token);
+    document.getElementById('sDist').textContent=fmt(s.total_distributed);
+  }
+  const body=document.getElementById('capBody');body.innerHTML='';
+  (hb||[]).forEach(h=>{const a=Number(h.claimable);const tr=document.createElement('tr');
+    tr.innerHTML=`<td><b>${esc(h.name)}</b></td><td class="muted">${esc(h.role)}</td>
+      <td class="num">${h.tokens}</td><td class="num">${(h.tokens/10).toFixed(1)}%</td>
+      <td class="num ${a>0?'ok':''}">${fmt(a)}</td><td class="num muted">${fmt(h.claimed)}</td>
+      <td><button class="ghost sm" ${a<=0?'disabled':''} onclick="claim('${h.id}')">Claim</button></td>`;
+    body.appendChild(tr);});
+  const events=[...(rev||[]).map(r=>({t:r.created_at,html:`${esc(r.label)} paid <b>${fmt(r.amount)}</b> → every token has earned ${fmt4(r.cum_after)} cumulatively.`})),
+                ...(cl||[]).map(c=>({t:c.created_at,html:`<b>${esc(c.holder_name)}</b> claimed <b>${fmt(c.amount)}</b>.`}))]
+    .sort((a,b)=>new Date(b.t)-new Date(a.t));
+  const lg=document.getElementById('auditLog');lg.innerHTML='';
+  events.forEach(e=>{const d=document.createElement('div');d.className='logline';
+    d.innerHTML=`<span class="muted">${new Date(e.t).toLocaleTimeString()}</span> &nbsp; ${e.html}`;lg.appendChild(d);});
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- REALTIME ---------- */
+function subscribeRealtime(){
+  sb.channel('demu-live')
+    .on('postgres_changes',{event:'*',schema:'public',table:'songs'},()=>refresh())
+    .on('postgres_changes',{event:'*',schema:'public',table:'holders'},()=>renderSong())
+    .on('postgres_changes',{event:'*',schema:'public',table:'revenue_events'},()=>renderSong())
+    .on('postgres_changes',{event:'*',schema:'public',table:'claims'},()=>renderSong())
+    .subscribe();
+}
+async function refresh(){ await loadSongs(); }
+
+/* ---------- STRESS TEST (client-side; mirrors the Python model) ---------- */
+const CHAINS=[
+  {name:'Sui',tps:1000,fin:.5,priv:true,proofS:.8,pf:.6,color:'#7f77dd'},
+  {name:'Cardano (base)',tps:12,fin:20,priv:false,proofS:0,pf:1,color:'#fbbf24'},
+  {name:'Cardano + Midnight',tps:12,fin:20,priv:true,proofS:2.5,pf:.4,color:'#f0997b'},
+  {name:'Solana',tps:2000,fin:.6,priv:false,proofS:0,pf:1,color:'#34d399'},
+];
+const fmtDays=d=>!isFinite(d)?'never':d<1/24?(d*1440).toFixed(0)+' min':d<1?(d*24).toFixed(1)+' hr':d<365?d.toFixed(1)+' days':(d/365).toFixed(1)+' yr';
+const fmtLat=s=>!isFinite(s)?'∞':s<60?s.toFixed(1)+'s':s<3600?(s/60).toFixed(1)+'m':s<86400?(s/3600).toFixed(1)+'h':(s/86400).toFixed(1)+'d';
+function runStress(){
+  const backfill=+v('kBackfill')*1e6,newPerDay=+v('kNew')*1000,batch=+v('kBatch'),target=+v('kTarget');
+  set('oBackfill',v('kBackfill')+'M');set('oNew',v('kNew')+'k');set('oBatch',batch);set('oTarget',target);
+  const arrival=newPerDay/86400;
+  const rows=CHAINS.map(c=>{const conf=c.priv;const reg=c.tps*(conf?c.pf:1)*batch;const keeps=reg>arrival;
+    const net=reg-arrival;const drain=net>0?backfill/net/86400:Infinity;const floor=c.fin+(conf?c.proofS:0);
+    const p99=keeps?floor+0.99*(backfill/reg):Infinity;const pass=keeps&&drain<=target;return{c,conf,reg,drain,p99,pass};});
+  const tb=document.getElementById('stressBody');tb.innerHTML='';
+  rows.forEach(r=>{const tr=document.createElement('tr');
+    tr.innerHTML=`<td><b>${r.c.name}</b></td><td class="muted">${r.conf?'on (native)':'none'}</td>
+      <td class="num">${Math.round(r.reg).toLocaleString()}</td>
+      <td class="num ${r.pass?'ok':'bad'}">${fmtDays(r.drain)}</td><td class="num">${fmtLat(r.p99)}</td>
+      <td>${r.pass?'<span class=tag-pass>PASS</span>':'<span class=tag-fail>FAIL</span>'}</td>`;tb.appendChild(tr);});
+  const bars=document.getElementById('bars');bars.innerHTML='';const maxLog=Math.log10(365*5);
+  rows.forEach(r=>{const d=isFinite(r.drain)?r.drain:365*5;const pct=Math.max(4,Math.min(100,(Math.log10(Math.max(d,.01))+2)/(maxLog+2)*100));
+    const w=document.createElement('div');w.style.margin='10px 0';
+    w.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:4px">
+      <span style="font-size:13px">${r.c.name}${r.conf?' <span class="muted">+ privacy</span>':''}</span>
+      <span style="font-size:13px;font-weight:700" class="${r.pass?'ok':'bad'}">${fmtDays(r.drain)}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${r.pass?r.c.color:'#f87171'}">${r.pass?'':'misses target'}</div></div>`;
+    bars.appendChild(w);});
+}
+const v=id=>document.getElementById(id).value;
+const set=(id,t)=>document.getElementById(id).textContent=t;
+document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')signIn();});
+
+boot();
+</script>
+</body>
+</html>
